@@ -332,13 +332,13 @@ async function leave(){clearInterval(hb);const c=ch;ch=null;const code=room;room
 $('#lv').onclick=leave;
 
 /* ---- boot ---- */
-(async()=>{setSt('conn');applyLang();
+(async()=>{setSt('conn');applyLang();let step='session';
  try{let{data:{session}}=await sb.auth.getSession();
-  if(!session){const{data,error}=await sb.auth.signInAnonymously();if(error)throw error;session=data.session}
-  uid=session.user.id;
+  if(!session){step='anonymous sign-in';const{data,error}=await sb.auth.signInAnonymously();if(error)throw error;session=data.session}
+  uid=session.user.id;step='profiles table';
   const{data:pf,error}=await sb.from('profiles').select('alias').eq('id',uid).maybeSingle();if(error)throw error;
   setSt('live');if(pf){me=pf.alias;go('mode')}else go('reg')
- }catch(e){console.error(e);setSt('off');go('reg');err('re','errNet')}
+ }catch(e){console.error(step,e);setSt('off');go('reg');err('re','errNet');$('#re').append(' ['+step+': '+(e&&e.message||e)+']')}
 })();
 </script>
 </body>
