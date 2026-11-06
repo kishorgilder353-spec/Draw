@@ -81,6 +81,8 @@ aside{display:flex;flex-direction:column;gap:12px;min-height:0}
 #pv{width:34px;height:34px;border-radius:6px;border:1px solid var(--ln);overflow:hidden;background:repeating-conic-gradient(#ccc 0 25%,#fff 0 50%) 0 0/10px 10px}
 #pv i{display:block;height:100%}
 #hx{width:96px!important}
+#pad{display:flex;align-items:center;justify-content:center;height:84px;border:1.5px dashed var(--ac);border-radius:8px;color:var(--ac);background:rgba(14,107,115,.06);touch-action:none;text-align:center;padding:0 12px;font-size:13px;user-select:none}
+#smw{display:flex}#smw input{width:90px}
 #aim{position:absolute;width:24px;height:24px;pointer-events:none;z-index:5;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45))}
 #fsbar{display:none;position:fixed;top:6px;right:6px;z-index:31;gap:6px}
 body.fs{overflow:hidden}body.fs #fsbar{display:flex}
@@ -102,7 +104,7 @@ body.fs.chat aside{display:flex}
 </head>
 <body>
 <header>
- <div class="brand" data-i="brand"></div><small style="color:var(--mu)">v3 · 11-06</small><div class="sp"></div>
+ <div class="brand" data-i="brand"></div><small style="color:var(--mu)">v4 · 11-06</small><div class="sp"></div>
  <span id="st" class="st"></span><button id="who" hidden></button>
  <div class="seg" id="lg"><button data-l="0">中文</button><button data-l="1">EN</button><button data-l="2">ID</button></div>
 </header>
@@ -141,9 +143,11 @@ body.fs.chat aside{display:flex}
    <div class="rinfo"><button id="lv" data-i="leave"></button><span class="tag" id="rmode"></span><span><span data-i="code"></span> <b id="rc"></b></span><span><span data-i="pass"></span> <b id="rpw"></b></span><button id="rcopy" data-i="copy"></button></div>
    <div id="bar"><div id="msg"></div><div id="tm"></div><button class="pri" id="go" hidden></button></div>
    <div class="cw"><canvas id="cv"></canvas><div id="aim" hidden><svg viewBox="0 0 24 24" width="24" height="24"><path d="M3 2l16 9-7 2-3 7z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg></div></div>
+   <div id="pad" hidden data-i="padL"></div>
    <div class="tb">
     <div class="row"><div class="seg"><button id="bp" class="on" data-i="pen"></button><button id="be" data-i="eraser"></button></div>
      <button id="am" data-i="aimL"></button><label id="gnw" hidden><span data-i="gainL"></span><input type="range" id="gn" min=".5" max="2.5" step=".1" value="1"></label>
+     <label id="smw" hidden><span data-i="smL"></span><input type="range" id="sm" min="0" max="10" step="1" value="4"></label>
      <button id="un" data-i="undo"></button><button id="cr" data-i="clear"></button><button id="sv" data-i="save"></button><button id="fs" data-i="fsL"></button></div>
     <div class="row"><canvas id="psv"></canvas>
      <div class="cs"><label><span data-i="hueL"></span><input type="range" class="rg" id="hu" min="0" max="360" value="190"></label>
@@ -213,6 +217,8 @@ yours:['轮到你画：','Your turn to draw: ','Giliranmu: '],
 over:['时间到，答案是：','Time is up. The word was: ','Waktu habis. Katanya: '],
 demo:['静态预览：尚未连接服务器，内容只在本机可见。','Static preview: no server yet, everything stays on this device.','Pratinjau statis: belum ada server, semua hanya di perangkat ini.'],
 me:['我','me','saya'],
+padL:['在这里拖动，只移动箭头（不会画画）','Drag here to move the arrow only (no drawing)','Geser di sini untuk memindahkan panah saja (tidak menggambar)'],
+smL:['稳定','Steady','Stabil'],
 hueL:['色相','Hue','Rona'],opL:['透明度','Opacity','Opasitas'],szL:['粗细','Size','Ukuran'],
 aimL:['辅助画画','Aim assist','Bantuan'],gainL:['灵敏度','Speed','Kecepatan'],
 fsL:['全屏','Fullscreen','Layar penuh'],exitFs:['退出全屏','Exit','Keluar'],toolL:['工具','Tools','Alat'],
@@ -293,25 +299,36 @@ const send=(ev,p={})=>ch&&ch.send({type:'broadcast',event:ev,payload:p});
 const canDraw=()=>mode=='free'||(game.ph=='draw'&&game.drawer==uid);
 const rect=()=>cv.getBoundingClientRect(),ev2=e=>e.getCoalescedEvents?e.getCoalescedEvents():[e];
 const pt=(x,y)=>[+clamp(x).toFixed(4),+clamp(y).toFixed(4)];
-let cs=null,buf=[],aim=false,down=false,ax=.5,ay=.5,gain=1,lx=0,ly=0;
+let cs=null,buf=[],aim=false,down=false,ax=.5,ay=.5,gain=1,smooth=4,fx=0,fy=0,rx=0,ry=0,lx=0,ly=0;
 function hsv2rgb(h,s,v){const f=(n,k=(n+h/60)%6)=>v-v*s*Math.max(0,Math.min(k,4-k,1));return[f(5),f(3),f(1)].map(x=>Math.round(x*255))}
 function rgb2hsv(r,g,b){r/=255;g/=255;b/=255;const m=Math.max(r,g,b),d=m-Math.min(r,g,b);let h=0;if(d){h=m==r?((g-b)/d)%6:m==g?(b-r)/d+2:(r-g)/d+4;h=(h*60+360)%360}return[h,m?d/m:0,m]}
 const hex=()=>'#'+hsv2rgb(hh,ss,vv).map(x=>x.toString(16).padStart(2,'0')).join('');
 function begin(p){cs={id:uid.slice(0,6)+Date.now().toString(36),c:hex(),a:alpha,w:size,e:erase,o:uid,p:[p]};S.set(cs.id,cs);order.push(cs.id);live.add(cs);buf=[p];mark()}
 function extend(p){cs.p.push(p);buf.push(p)}
 function flush(){if(!buf.length||!cs)return;send('seg',{i:cs.id,c:cs.c,a:cs.a,w:cs.w,e:cs.e,o:cs.o,p:buf});buf=[]}
-function finish(){down=false;if(!cs)return;flush();mine.push(cs.id);commit(cs);send('end',{i:cs.id});cs=null;mark()}
+function finish(){if(aim&&down&&cs){const r=rect();for(let i=0;i<80&&step(r);i++);}down=false;if(!cs)return;flush();mine.push(cs.id);commit(cs);send('end',{i:cs.id});cs=null;mark()}
+const alp=()=>1/(1+smooth);
+function step(r){ // low-pass the finger, then move the arrow by the filtered change
+ if(Math.abs(rx-fx)+Math.abs(ry-fy)<.35)return false;
+ fx+=(rx-fx)*alp();fy+=(ry-fy)*alp();
+ ax=clamp(ax+(fx-lx)/r.width*gain);ay=clamp(ay+(fy-ly)/r.height*gain);lx=fx;ly=fy;
+ const l=cs.p[cs.p.length-1];if(Math.hypot((ax-l[0])*W,(ay-l[1])*H)>=1.2)extend(pt(ax,ay));
+ return true}
 cv.onpointerdown=e=>{if(!canDraw()||e.button>0)return;cv.setPointerCapture(e.pointerId);const r=rect();
- if(aim){down=true;lx=e.clientX;ly=e.clientY}else begin(pt((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height))};
+ if(aim){down=true;rx=fx=lx=e.clientX;ry=fy=ly=e.clientY}else begin(pt((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height))};
 cv.onpointermove=e=>{const r=rect();
- if(aim){if(!down)return;for(const v of ev2(e)){if(!cs)begin(pt(ax,ay));ax=clamp(ax+(v.clientX-lx)/r.width*gain);ay=clamp(ay+(v.clientY-ly)/r.height*gain);lx=v.clientX;ly=v.clientY;extend(pt(ax,ay))}placeAim();mark();return}
+ if(aim){if(!down)return;for(const v of ev2(e)){rx=v.clientX;ry=v.clientY;if(!cs&&Math.abs(rx-fx)+Math.abs(ry-fy)>=.35)begin(pt(ax,ay));if(cs)step(r)}placeAim();mark();return}
  if(!cs)return;for(const v of ev2(e))extend(pt((v.clientX-r.left)/r.width,(v.clientY-r.top)/r.height));mark()};
 cv.onpointerup=cv.onpointercancel=finish;
-function placeAim(){const a=$('#aim');a.hidden=!(aim&&canDraw()&&page=='room');if(a.hidden)return;const r=rect(),w=$('.cw').getBoundingClientRect();
+function placeAim(){const a=$('#aim'),show=aim&&canDraw()&&page=='room';a.hidden=!show;$('#pad').hidden=!show;if(!show)return;const r=rect(),w=$('.cw').getBoundingClientRect();
  a.style.left=(r.left-w.left+ax*r.width-3)+'px';a.style.top=(r.top-w.top+ay*r.height-2)+'px'}
 addEventListener('resize',placeAim);
-$('#am').onclick=()=>{aim=!aim;$('#am').classList.toggle('on',aim);$('#gnw').hidden=!aim;placeAim()};
-$('#gn').oninput=e=>gain=+e.target.value;
+$('#am').onclick=()=>{aim=!aim;$('#am').classList.toggle('on',aim);$('#gnw').hidden=!aim;$('#smw').hidden=!aim;placeAim()};
+$('#gn').oninput=e=>gain=+e.target.value;$('#sm').oninput=e=>smooth=+e.target.value;
+const pad=$('#pad');let pd=false,px=0,py=0;
+pad.onpointerdown=e=>{pad.setPointerCapture(e.pointerId);pd=true;px=e.clientX;py=e.clientY};
+pad.onpointermove=e=>{if(!pd)return;const r=rect();for(const v of ev2(e)){ax=clamp(ax+(v.clientX-px)/r.width*2.5);ay=clamp(ay+(v.clientY-py)/r.height*2.5);px=v.clientX;py=v.clientY}placeAim()};
+pad.onpointerup=pad.onpointercancel=()=>{pd=false};
 
 /* color picker (HSV square + hue + opacity + hex) */
 const psv=$('#psv'),pg=psv.getContext('2d'),PW=180,PH=120;psv.width=PW;psv.height=PH;
